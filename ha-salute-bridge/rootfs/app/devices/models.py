@@ -2,31 +2,21 @@
 За основу берём названия в HA
 В сберовкие данные переводим в конвертере
 """
+from enum import StrEnum, auto
 
 from pydantic import BaseModel, Field
 
 
-class LightModel(BaseModel):
-    is_on: bool = False # on_off
-    brightness: int | None = Field(gt=0, le=255) # light_brightness INTEGER(50,1000)
-    # light_colour_temp
-    # light_scene
-    # light_mode
-    # light_colour "colour_value": { "h": 360, "s": 1000, "v": 1000 }
-
-
-class LedStripModel(BaseModel):
-    is_on: bool = False # on_off
-    brightness: int | None = Field(gt=0, le=255) # light_brightness INTEGER(50,1000)
-    # light_colour_temp
-    # light_mode
-    # light_colour "colour_value": { "h": 360, "s": 1000, "v": 1000 }
+class DeviceModelsEnum(StrEnum):
+    light = auto()
+    led_strip = auto()
 
 
 class DeviceModel(BaseModel):
-    enabled: bool = False
-    properties: LightModel = Field(title="Наследуемая модель")
-
-
-class DevisesListModel(BaseModel):
-    devices: list[DeviceModel]
+    entity_id: str = Field(title="Идентификатор устройства из HA")
+    category: str = Field(title="Тип устройства из HA")
+    enabled: bool | None = None
+    friendly_name: str | None = None
+    state: str
+    model: DeviceModelsEnum
+    attributes: dict | None = None

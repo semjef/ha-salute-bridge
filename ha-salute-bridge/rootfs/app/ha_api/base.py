@@ -1,7 +1,7 @@
 import asyncio
 import os
 from typing import Any, Callable
-import logging as log
+import logging
 import requests
 
 from hass_client.exceptions import (
@@ -13,6 +13,8 @@ from hass_client.exceptions import (
 )
 from hass_client.models import Event
 
+from devices.base import Devices
+from devices.models import DeviceModel, DeviceModelsEnum
 from models.exceptions import NotFoundAgainError, ServiceTimeoutError
 from .client import HomeAssistantClient
 
@@ -22,7 +24,7 @@ class HAApiClient:
         self.options = options
         self.queue_write = queue_write
         self.queue_read = queue_read
-        self.devices = devices
+        self.devices: Devices = devices
 
         self.connection_task: asyncio.Task | None = None
         self.update_task: asyncio.Task | None = None
@@ -66,7 +68,6 @@ class HAApiClient:
 
     async def update(self):
         while True:
-            # await self.handle_exception_in_func(self.clock.run)
             await asyncio.sleep(0.25)
 
     def handle_exception_in_loop(
@@ -92,17 +93,17 @@ class HAApiClient:
 
         match exception:
             case NotFoundError():
-                log.error(exception)
+                logging.error(exception)
             case NotFoundAgainError():
-                log.debug(exception)
+                logging.debug(exception)
             case ServiceTimeoutError():
-                log.debug(exception)
+                logging.debug(exception)
             case asyncio.CancelledError():
-                log.error("Operation was cancelled")
+                logging.error("Operation was cancelled")
             case FailedCommand():
-                log.error(exception)
+                logging.error(exception)
             case NotConnected() | CannotConnect() | ConnectionFailed():
-                log.error("connection error")
+                logging.error("connection error")
                 if (
                     self.update_task is not None
                     and not self.update_task.done()
@@ -116,36 +117,27 @@ class HAApiClient:
                     self.client.connect()
                 )
             case Exception():
-                log.exception(exception)
+                logging.exception(exception)
 
     async def on_events(self, event: Event):
-        # log.debug("on_events %s", event)
+        # logging.debug("on_events %s", event)
         if event.event_type != 'state_changed':
             return
-        _id = event.data['new_state']['entity_id']
+        entity_id = event.data['new_state']['entity_id']
         old_state = event.data['old_state']['state']
         new_state = event.data['new_state']['state']
-        dev = self.devices.DB.get(_id, None)
-        if dev is not None:
-            if dev['enabled']:
-                log.debug('HA Event: %s: %s -> %s', _id, old_state, new_state)
-                if dev['category'] == 'sensor_temp':
-                    self.devices.change_state(_id, 'temperature', float(new_state))
-                if new_state == 'on':
-                    self.devices.change_state(_id, 'on_off', True)
-                    if not (self.devices.DB[_id]['States'].get('button_event', None) is None):
-                        self.devices.DB[_id]['States']['button_event'] = 'click'
-                else:
-                    self.devices.change_state(_id, 'on_off', False)
-                    if not (self.devices.DB[_id]['States'].get('button_event', None) is None):
-                        self.devices.DB[_id]['States']['button_event'] = 'double_click'
-                await self.send_data(self.devices.do_mqtt_json_states_list([_id]))
+        device = self.devices[entity_id]
+        if device is None or not device.enabled:
+            return
+        logging.debug('HA Event: %s: %s -> %s', entity_id, old_state, new_state)
+        self.devices.change_state(entity_id, new_state)
+        await self.send_data(entity_id)
 
     async def send_data(self, data):
         await self.queue_write.put({"type": "status", "data": data})
 
     async def send_conf(self):
-        await self.queue_write.put({"type": "conf", "data": self.devices.do_mqtt_json_devices_list()})
+        await self.queue_write.put({"type": "conf"})
 
     async def queue_processer(self):
         while True:
@@ -154,8 +146,14 @@ class HAApiClient:
             await asyncio.sleep(1)
         while True:
             entity_id = await self.queue_read.get()
-            log.debug('Отправляем команду в HA для %s', entity_id)
-            data = self.devices.get_ha_entity_data(entity_id)
+            logging.debug('Отправляем команду в HA для %s', entity_id)
+            device = self.devices[entity_id]
+            match device.category:
+                case 'light':
+                    data = self.process_light(device)
+                case _:
+                    # Не обрабатываем ничего, кроме этих типов
+                    continue
             req = {
                 "domain": data["entity_domain"],
                 "service": data["service"],
@@ -169,10 +167,22 @@ class HAApiClient:
             await self.client.send_command("call_service", **req)
             self.queue_read.task_done()
 
+    @staticmethod
+    def process_light(device):
+        service = 'turn_on' if device.state == "on" else 'turn_off'
+        data = {
+            "entity_domain": device.category,
+            "entity_name": device.entity_id,
+            "service": service
+        }
+        if device.attributes and "brightness" in device.attributes:
+            data['service_data'] = {"brightness": device.attributes["brightness"]}
+        return data
+
     async def startup_load(self):
         hds = {'Authorization': f'Bearer {self.ha_api_token}', 'content-type': 'application/json'}
         url = f'{self.ha_api_url}/states'
-        log.debug('Подключаемся к HA, (ha-api_url: %s)', url)
+        logging.debug('Подключаемся к HA, (ha-api_url: %s)', url)
         cx = 0
         ha_dev = []
         loading = True
@@ -181,33 +191,42 @@ class HAApiClient:
             try:
                 res = requests.get(url, headers=hds)
                 if res.status_code == 200:
-                    log.info('Запрос устройств из Home Assistant выполнен штатно.')
+                    logging.info('Запрос устройств из Home Assistant выполнен штатно.')
                     ha_dev = res.json()
-                    log.debug(ha_dev)
+                    logging.debug(ha_dev)
                     loading = False
                 else:
-                    log.error('ОШИБКА! Запрос устройств из Home Assistant выполнен некоректно. (%s)', str(res.status_code))
+                    logging.error('ОШИБКА! Запрос устройств из Home Assistant выполнен некоректно. (%s)', str(res.status_code))
             except:
-                log.error('Ошибка подключения к HA. Ждём 5 сек перед повторным подключением.')
+                logging.error('Ошибка подключения к HA. Ждём 5 сек перед повторным подключением.')
                 await asyncio.sleep(5)
 
         for s in ha_dev:
-            entity_type = s['entity_id'].split('.')[0]
-            dc = s.get('attributes', {}).get('device_class', '')
-            fn = s.get('attributes', {}).get('friendly_name', '')
-            match entity_type:
+            category = s['entity_id'].split('.')[0]
+            entity_id = s['entity_id'].split('.')[1]
+            attributes = s.get('attributes', {})
+            dc = attributes.get('device_class', '')
+            fn = attributes.get('friendly_name', '')
+            state = s.get('state', "")
+            match category:
                 case "switch":
-                    log.debug('switch: %s %s', s['entity_id'], fn)
-                    self.devices.update(
-                        s['entity_id'],
-                        {'entity_ha': True, 'entity_type': 'sw', 'friendly_name': fn, 'category': 'relay'}
-                    )
+                    logging.debug('switch: %s %s', s['entity_id'], fn)
+                    # self.devices.update(
+                    #     s['entity_id'],
+                    #     {'entity_ha': True, 'entity_type': 'sw', 'friendly_name': fn, 'category': 'relay'}
+                    # )
                 case "light":
-                    log.debug('light: %s %s', s['entity_id'], fn)
-                    self.devices.update(
-                        s['entity_id'],
-                        {'entity_ha': True, 'entity_type': 'light', 'friendly_name': fn, 'category': 'light'}
+                    logging.debug('light: %s %s', s['entity_id'], fn)
+                    entity = DeviceModel(
+                        entity_id=entity_id,
+                        category=category,
+                        friendly_name=fn,
+                        state=state,
+                        model=DeviceModelsEnum.light
                     )
+                    if "brightness" in attributes:
+                        entity.attributes = {"brightness": attributes["brightness"]}
+                    self.devices.update(s['entity_id'], entity)
                     # {'entity_id': 'light.0x54ef441000b86867_l1', 'state': 'on',
                     #  'attributes': {'min_color_temp_kelvin': 2702, 'max_color_temp_kelvin': 6535, 'min_mireds': 153,
                     #                 'max_mireds': 370, 'supported_color_modes': ['color_temp', 'xy'], 'color_mode': 'xy',
@@ -219,36 +238,36 @@ class HAApiClient:
                     #  'last_updated': '2024-12-11T11:59:04.194943+00:00',
                     #  'context': {'id': '01JETSCGSD599T5JBGZFA0VX00', 'parent_id': None, 'user_id': None}}
                 case "script":
-                    log.debug('script: %s %s', s['entity_id'], fn)
-                    self.devices.update(
-                        s['entity_id'],
-                        {'entity_ha': True, 'entity_type': 'scr', 'friendly_name': fn, 'category': 'relay'}
-                    )
+                    logging.debug('script: %s %s', s['entity_id'], fn)
+                    # self.devices.update(
+                    #     s['entity_id'],
+                    #     {'entity_ha': True, 'entity_type': 'scr', 'friendly_name': fn, 'category': 'relay'}
+                    # )
                 case "sensor":
                     if dc == 'temperature':
-                        log.debug('sensor (temperature): %s %s', s['entity_id'], fn)
-                        self.devices.update(
-                            s['entity_id'],
-                            {'entity_ha': True, 'entity_type': 'sensor_temp', 'friendly_name': fn,
-                              'category': 'sensor_temp'}
-                        )
+                        logging.debug('sensor (temperature): %s %s', s['entity_id'], fn)
+                        # self.devices.update(
+                        #     s['entity_id'],
+                        #     {'entity_ha': True, 'entity_type': 'sensor_temp', 'friendly_name': fn,
+                        #       'category': 'sensor_temp'}
+                        # )
                 case "input_boolean":
-                    log.debug('input_boolean: %s %s', s['entity_id'], fn)
-                    self.devices.update(
-                        s['entity_id'],
-                        {'entity_ha': True, 'entity_type': 'input_boolean', 'friendly_name': fn,
-                         'category': 'scenario_button'}
-                    )
+                    logging.debug('input_boolean: %s %s', s['entity_id'], fn)
+                    # self.devices.update(
+                    #     s['entity_id'],
+                    #     {'entity_ha': True, 'entity_type': 'input_boolean', 'friendly_name': fn,
+                    #      'category': 'scenario_button'}
+                    # )
                 case "hvac_radiator":
                     if dc == 'temperature':
-                        log.debug('hvac_radiator (temperature): %s %s', s['entity_id'], fn)
-                        self.devices.update(
-                            s['entity_id'],
-                            {'entity_ha': True, 'entity_type': 'hvac_radiator', 'friendly_name': fn,
-                             'category': 'hvac_radiator'}
-                        )
+                        logging.debug('hvac_radiator (temperature): %s %s', s['entity_id'], fn)
+                        # self.devices.update(
+                        #     s['entity_id'],
+                        #     {'entity_ha': True, 'entity_type': 'hvac_radiator', 'friendly_name': fn,
+                        #      'category': 'hvac_radiator'}
+                        # )
                 case _:
-                    log.debug('Неиспользуемый тип: %s',s['entity_id'])
-        self.devices.save_DB()
+                    logging.debug('Неиспользуемый тип: %s',s['entity_id'])
+        self.devices.save()
         await self.send_conf()
 

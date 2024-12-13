@@ -95,7 +95,7 @@ function UpdateDeviceList(d) {
                     break;
                 case 'extra':
                     if (d[i][k]) {
-                        r = '<input type="checkbox" data-id="' + i + '" checked onchange=ChangeDev(this)>';
+                        r = '<input type="checkbox" data-id="' + i + '" data-type="' + i + '" checked onchange=ChangeDev(this)>';
                     }
                     break;
                 default:

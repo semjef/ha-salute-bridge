@@ -6,8 +6,6 @@ import logging as log
 
 from options import options_change
 
-1
-
 
 class MqttClient:
     def __init__(self, options, queue_write, queue_read, devices):
