@@ -1,0 +1,41 @@
+name: "SaluteBridge"
+description: "Use your Salute assistent with HomeAssistant"
+version: "1.0.0"
+slug: "ha-salute-bridge"
+webui: "http://[HOST]:[PORT:9321]"
+startup: application
+boot: auto
+init: false
+arch:
+  - aarch64
+  - amd64
+  - armhf
+  - armv7
+  - i386
+
+ports:
+  9321/tcp: 9321
+ports_description:
+  9321/tcp: Management
+
+homeassistant_api: true
+
+options:
+  ha_api_url: "http://ha_server_ip:8123"
+  ha_api_token: ""
+  sd_mqtt_broker: "mqtt-partners.iot.sberdevices.ru"
+  sd_mqtt_broker_port: 8883
+  sd_mqtt_login: "mqtt-sber-login"
+  sd_mqtt_password: "mqtt-sber-password"
+  sd_http_api_endpoint: "https://mqtt-partners.iot.sberdevices.ru"
+  log_level: INFO
+
+schema:
+  ha_api_url: str
+  ha_api_token: str
+  sd_mqtt_broker: str
+  sd_mqtt_broker_port: int
+  sd_mqtt_login: str
+  sd_mqtt_password: password
+  sd_http_api_endpoint: str?
+  log_level: list(NOTSET|DEBUG|INFO|WARNING|ERROR|FATAL)
