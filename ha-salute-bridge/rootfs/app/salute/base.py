@@ -10,12 +10,13 @@ from devices import Devices, DeviceModel, DeviceModelsEnum, LightAttrsEnum
 from options import options_change
 
 
-class MqttClient:
-    def __init__(self, options, queue_write, queue_read, devices: Devices):
+class SaluteClient:
+    def __init__(self, options, queue_write, queue_read, devices: Devices, categories):
         self.options = options
         self.queue_write = queue_write
         self.queue_read = queue_read
         self.devices = devices
+        self.categories = categories
 
         self.client = None
         self.sber_root_topic = f"sberdevices/v1/{options['sd_mqtt_login']}"
@@ -63,6 +64,7 @@ class MqttClient:
         log.debug("on_message %s %s %s", msg.topic, msg.qos, msg.payload)
 
     async def send_status(self, data):
+        logging.debug("send_status:%s", data)
         await self.client.publish(f"{self.sber_root_topic}/up/status", data)
 
     async def send_config(self, data):
@@ -137,23 +139,74 @@ class MqttClient:
                 'name': device.name,
                 'model_id': ''
             }
-            category = self.devices.categories.get(device.category)
+            category_name = self.get_salute_category_name(device.category)
+            category = self.categories.get(category_name)
             features = []
             for ft in category:
                 if ft.get('required', False):
                     features.append(ft['name'])
+                # Будем выдавать список из доступных фич для каждого типа в вебе и
+                # юзер сам будет включать их для каждого элемента
             data['model'] = {
-                'id': 'ID_' + device.category,
+                'id': 'ID_' + category_name,
                 'manufacturer': manufacturer,
-                'model': 'Model_' + device.category,
-                'category': device.category,
+                'model': 'Model_' + category_name,
+                'category': category_name,
                 'features': features
             }
             devices.append(data)
         return json.dumps({'devices': devices}, ensure_ascii=False, sort_keys=True)
 
     def get_salute_states_list(self, entitys: list | None = None):
-        return
+        devices = {}
+        if not entitys:
+            entitys = self.devices.keys()
+        for entity_id in entitys:
+            device = self.devices[entity_id]
+            if device is None or not device.enabled:
+                continue
+            features = self.get_features(device)
+            devices[entity_id] = {'states': features}
+        return json.dumps({'devices': devices}, ensure_ascii=False, sort_keys=True)
+
+    @staticmethod
+    def get_salute_category_name(device):
+        ha_to_salude_category = {
+            "light": "light",
+            "switch": "relay",
+            "script": "relay",
+            "sensor": "sensor_temp"
+        }
+        # Ещё нужно учесть device.model
+        return ha_to_salude_category.get(device.category, "relay")
+
+    def get_features(self, device):
+        category_name = self.get_salute_category_name(device.category)
+        category = self.categories.get(category_name)
+        features = []
+        match device.category:
+            case 'light':
+                features.append(self.get_state_value("online", "BOOL", device.state != "unavailable"))
+                features.append(self.get_state_value("on_off", "BOOL", device.state == "on"))
+            case _:
+                # Не обрабатываем ничего, кроме этих типов
+                pass
+        return features
+
+    @staticmethod
+    def get_state_value(name, data_type, value):
+        # {'key':'online','value':{"type": "BOOL", "bool_value": True}}
+        r = {}
+        if name == 'temperature':
+            value = value * 10
+        if data_type == 'BOOL':
+            r = {'key': name, 'value': {'type': 'BOOL', 'bool_value': bool(value)}}
+        if data_type == 'INTEGER':
+            r = {'key': name, 'value': {'type': 'INTEGER', 'integer_value': int(value)}}
+        if data_type == 'ENUM':
+            r = {'key': name, 'value': {'type': 'ENUM', 'enum_value': value}}
+        return r
+
 
     async def queue_processer(self):
         while True:

@@ -11,7 +11,7 @@ from const import CATEGORIES_FILENAME, DEVICES_FILENAME
 from devices import GetCategory, Devices, DeviceModel, DeviceModelsEnum
 from options import load_options
 from logger import Logger
-from mqtt.base import MqttClient
+from salute.base import SaluteClient
 from ha_api.base import HAApiClient
 from web.routes import router
 
@@ -22,7 +22,7 @@ mqtt_queue = asyncio.Queue()
 ha_queue = asyncio.Queue()
 
 categories = GetCategory(opt, CATEGORIES_FILENAME)
-devices = Devices(categories, DEVICES_FILENAME)
+devices = Devices(DEVICES_FILENAME)
 
 if sys.platform.lower() == "win32" or os.name.lower() == "nt":
     from asyncio import set_event_loop_policy, WindowsSelectorEventLoopPolicy
@@ -31,15 +31,17 @@ if sys.platform.lower() == "win32" or os.name.lower() == "nt":
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    hac = HAApiClient(opt, queue_write=mqtt_queue, queue_read=ha_queue, devices=devices)
-    mqttc = MqttClient(opt, queue_write=ha_queue, queue_read=mqtt_queue, devices=devices)
+    ha_client = HAApiClient(opt, queue_write=mqtt_queue, queue_read=ha_queue, devices=devices)
+    salute_client = SaluteClient(
+        opt, queue_write=ha_queue, queue_read=mqtt_queue, devices=devices, categories=categories
+    )
 
-    await hac.startup_load()
+    await ha_client.startup_load()
 
-    asyncio.create_task(mqttc.listen())
-    asyncio.create_task(mqttc.queue_processer())
-    asyncio.create_task(hac.start())
-    asyncio.create_task(hac.queue_processer())
+    asyncio.create_task(salute_client.listen())
+    asyncio.create_task(salute_client.queue_processer())
+    asyncio.create_task(ha_client.start())
+    asyncio.create_task(ha_client.queue_processer())
 
     yield {"devices": devices, "mqtt_queue": mqtt_queue, "ha_queue": ha_queue}
 
