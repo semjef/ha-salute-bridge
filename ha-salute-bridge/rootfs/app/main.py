@@ -7,7 +7,8 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
-from devices import GetCategory, DevicesDB
+from const import CATEGORIES_FILENAME, DEVICES_FILENAME
+from devices import GetCategory, Devices, DeviceModel, DeviceModelsEnum
 from options import load_options
 from logger import Logger
 from mqtt.base import MqttClient
@@ -20,8 +21,8 @@ Logger.init(opt)
 mqtt_queue = asyncio.Queue()
 ha_queue = asyncio.Queue()
 
-categories = GetCategory(opt)
-devices = DevicesDB(categories)
+categories = GetCategory(opt, CATEGORIES_FILENAME)
+devices = Devices(categories, DEVICES_FILENAME)
 
 if sys.platform.lower() == "win32" or os.name.lower() == "nt":
     from asyncio import set_event_loop_policy, WindowsSelectorEventLoopPolicy

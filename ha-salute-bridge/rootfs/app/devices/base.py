@@ -18,11 +18,11 @@ class Devices:
 
     def load(self):
         data = json_read(self.devices_file)
-        self.devices = {key: DeviceModel(**val) for key, val in data}
+        self.devices = {key: DeviceModel(**val) for key, val in data.items()}
 
     def save(self):
         ta = TypeAdapter(dict[str, DeviceModel])
-        with open(self.devices_file, 'w', encoding='utf-8') as f:
+        with open(self.devices_file, 'wb') as f:
             f.write(ta.dump_json(self.devices, indent=4))
 
     def update(self, key: str, data: DeviceModel):
@@ -39,3 +39,7 @@ class Devices:
         if key not in self.devices:
             return None
         return self.devices[key].model_copy()  # Возвращаем для предотвращения изменений
+
+    def __iter__(self):
+        for key, val in self.devices.items():
+            yield key, val.model_copy()

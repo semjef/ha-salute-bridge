@@ -12,11 +12,15 @@ class DeviceModelsEnum(StrEnum):
     led_strip = auto()
 
 
+class LightAttrsEnum(StrEnum):
+    brightness = auto()
+
+
 class DeviceModel(BaseModel):
     entity_id: str = Field(title="Идентификатор устройства из HA")
     category: str = Field(title="Тип устройства из HA")
     enabled: bool | None = None
-    friendly_name: str | None = None
+    name: str | None = None
     state: str
     model: DeviceModelsEnum
     attributes: dict | None = None

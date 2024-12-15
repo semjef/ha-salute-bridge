@@ -8,7 +8,7 @@ def json_read(fname):
             r = json.loads(f.read())
         except:
             r = {}
-            log.error('!!! Неверная конфигурация в файле: '+f)
+            log.error('!!! Неверная конфигурация в файле: %s', f)
         return r
 
 def json_write(fname, data):

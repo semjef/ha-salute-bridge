@@ -1,9 +1,9 @@
 import asyncio
+import logging
 import os
 from typing import Any, Callable
-import logging
-import requests
 
+import requests
 from hass_client.exceptions import (
     CannotConnect,
     ConnectionFailed,
@@ -13,8 +13,7 @@ from hass_client.exceptions import (
 )
 from hass_client.models import Event
 
-from devices.base import Devices
-from devices.models import DeviceModel, DeviceModelsEnum
+from devices import Devices, DeviceModel, DeviceModelsEnum, LightAttrsEnum
 from models.exceptions import NotFoundAgainError, ServiceTimeoutError
 from .client import HomeAssistantClient
 
@@ -66,7 +65,8 @@ class HAApiClient:
         ):
             self.update_task = self.loop.create_task(self.update())
 
-    async def update(self):
+    @staticmethod
+    async def update():
         while True:
             await asyncio.sleep(0.25)
 
@@ -186,7 +186,7 @@ class HAApiClient:
         cx = 0
         ha_dev = []
         loading = True
-        while cx < 10 or loading:
+        while cx < 10 and loading:
             cx = cx + 1
             try:
                 res = requests.get(url, headers=hds)
@@ -220,12 +220,12 @@ class HAApiClient:
                     entity = DeviceModel(
                         entity_id=entity_id,
                         category=category,
-                        friendly_name=fn,
+                        name=fn,
                         state=state,
                         model=DeviceModelsEnum.light
                     )
                     if "brightness" in attributes:
-                        entity.attributes = {"brightness": attributes["brightness"]}
+                        entity.attributes = {LightAttrsEnum.brightness: attributes["brightness"]}
                     self.devices.update(s['entity_id'], entity)
                     # {'entity_id': 'light.0x54ef441000b86867_l1', 'state': 'on',
                     #  'attributes': {'min_color_temp_kelvin': 2702, 'max_color_temp_kelvin': 6535, 'min_mireds': 153,

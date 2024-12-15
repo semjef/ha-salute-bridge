@@ -4,17 +4,20 @@ import os
 import requests
 import logging as log
 
-from const import CATEGORIES_FILENAME, DEVICES_FILENAME
+from .base import Devices
+from .models import *
+
+from const import DEVICES_FILENAME
 from utils import json_read, json_write
 
 VERSION = '1.0.15'
 
 
-def GetCategory(options):
+def GetCategory(options, categories_file):
     hds = {'content-type': 'application/json'}
     auth = (options['sd_mqtt_login'], options['sd_mqtt_password'])
     categories_url = f"{options['sd_http_api_endpoint']}/v1/mqtt-gate/categories"
-    if not os.path.exists(CATEGORIES_FILENAME):
+    if not os.path.exists(categories_file):
         log.info('Файл категорий отсутствует. Получаем...')
         categories = {}
         SD_Categories = requests.get(
@@ -33,8 +36,8 @@ def GetCategory(options):
         #   log(Categories)
         json_write('categories.json', categories)
     else:
-        log.info('Список категорий получен из файла: ' + CATEGORIES_FILENAME)
-        categories = json_read(CATEGORIES_FILENAME)
+        log.info('Список категорий получен из файла: ' + categories_file)
+        categories = json_read(categories_file)
     return categories
 
 
