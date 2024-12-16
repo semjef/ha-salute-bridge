@@ -87,12 +87,12 @@ class SaluteClient:
                     case 'BOOL':
                         val = state['value'].get('bool_value', False)
                     case 'INTEGER':
-                        val = state['value'].get('integer_value', 0)
+                        val = int(state['value'].get('integer_value', 0))
                     case 'ENUM':
                         val = state['value'].get('enum_value', '')
                 match state['key']:
                     case 'on_off':
-                        device.state = val
+                        device.state = "on" if val else "off"
                     case 'light_brightness':
                         val = int(val / 10 * 2.55)  # приводим из 50-1000 к диапозону 1-255
                         device.attributes[LightAttrsEnum.brightness] = val
@@ -135,22 +135,28 @@ class SaluteClient:
             if not device.enabled:
                 continue
             data = {
-                'id': device,
+                'id': entity_id,
                 'name': device.name,
                 'model_id': ''
             }
-            category_name = self.get_salute_category_name(device.category)
+            category_name = self.get_salute_category_name(device)
             category = self.categories.get(category_name)
             features = []
             for ft in category:
                 if ft.get('required', False):
                     features.append(ft['name'])
+                if (
+                    ft['name'] == 'light_brightness' and
+                    device.features and
+                    LightAttrsEnum.brightness in device.features
+                ):
+                    features.append(ft['name'])
                 # Будем выдавать список из доступных фич для каждого типа в вебе и
                 # юзер сам будет включать их для каждого элемента
             data['model'] = {
-                'id': 'ID_' + category_name,
+                'id': f'ID_{entity_id}',
                 'manufacturer': manufacturer,
-                'model': 'Model_' + category_name,
+                'model': 'Model_' + device.model,
                 'category': category_name,
                 'features': features
             }
@@ -181,13 +187,23 @@ class SaluteClient:
         return ha_to_salude_category.get(device.category, "relay")
 
     def get_features(self, device):
-        category_name = self.get_salute_category_name(device.category)
+        category_name = self.get_salute_category_name(device)
         category = self.categories.get(category_name)
         features = []
         match device.category:
             case 'light':
                 features.append(self.get_state_value("online", "BOOL", device.state != "unavailable"))
                 features.append(self.get_state_value("on_off", "BOOL", device.state == "on"))
+                if device.features:
+                    if LightAttrsEnum.brightness in device.features:
+                        val = device.attributes.get(LightAttrsEnum.brightness)
+                        if val is not None:  # Включено, но нету - не передаём
+                            val = int(val / 2.55 * 10)  # приводим из 1-255 к диапозону 50-1000
+                            if val < 50:
+                                val = 50
+                            if val > 1000:
+                                val = 1000
+                            features.append(self.get_state_value("light_brightness", "INTEGER", val))
             case _:
                 # Не обрабатываем ничего, кроме этих типов
                 pass
@@ -220,5 +236,5 @@ class SaluteClient:
                     await self.send_config(self.get_salute_devices_list())
                 case "status":
                     entity_id = data["data"]
-                    await self.send_status(self.get_salute_states_list(entity_id))
+                    await self.send_status(self.get_salute_states_list([entity_id]))
             self.queue_read.task_done()

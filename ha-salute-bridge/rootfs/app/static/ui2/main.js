@@ -30,29 +30,45 @@ function RunCmd(id, opt) {
 
 
 function ChangeDev(d) {
-    var t = {};
-    var s = {};
+    let t = {};
+    let s = {};
     t[d.dataset.id] = {}
     t[d.dataset.id]['enabled'] = d.checked;
     s['devices'] = [];
     s['devices'].push(t);
     apiSend(s, '/api/v2/devices');
-    //console.dir(d)
-//   console.log(d.dataset.id);
-//   console.log(d.checked);
+}
+
+
+function ChangeFeatures(d) {
+    let s = {};
+    s['entity_id'] = d.dataset.id;
+    s['feature'] = d.dataset.feature;
+    s['state'] = d.checked;
+    apiSend(s, '/api/v2/device/features');
 }
 
 function UpdateDeviceList(d) {
-//console.log(d);
     let f = {
         'enabled': 'Включено',
         'home': 'Дом',
         'room': 'Комната',
         'id': 'ID',
         'name': 'Имя',
-        'States': 'Состояния',
-        'extra': ''
+        'model': 'Модель',
+        'state': 'Состояние',
+        'attributes': 'Атрибуты',
+        'features': 'Функции устройства'
     }
+    // {
+    //   "entity_id": "vykliuchatel_gostinnaia_left",
+    //   "category": "light",
+    //   "enabled": null,
+    //   "name": "Бар",
+    //   "state": "off",
+    //   "model": "light",
+    //   "attributes": null
+    // },
     let table = document.getElementById('devices');
     if (!table) {
         table = document.createElement('table');
@@ -65,21 +81,21 @@ function UpdateDeviceList(d) {
     let tbody = document.createElement('tbody');
 
     let thead_row = document.createElement('tr');
-    for (k in f) {
+    for (let k in f) {
         let el = document.createElement('th');
         el.innerHTML = f[k];
         thead_row.append(el)
     }
     thead.appendChild(thead_row);
 
-    for (i in d) {
+    for (let i in d) {
         let tbody_row = document.createElement('tr');
-        for (k in f) {
+        for (let k in f) {
             let el = document.createElement('td');
             let r = '';
             switch (k) {
                 case 'id':
-                    r = i;
+                    r = d[i]["category"] + "." + d[i]["entity_id"];
                     break;
                 case 'enabled':
                     if (d[i][k]) {
@@ -88,14 +104,18 @@ function UpdateDeviceList(d) {
                         r = '<input type="checkbox" data-id="' + i + '" onchange=ChangeDev(this)>';
                     }
                     break;
-                case 'States':
-                    if (d[i]['States']) {
-                        r = JSON.stringify(d[i]['States']);
+                case 'attributes':
+                    if (d[i]['attributes']) {
+                        r = JSON.stringify(d[i]['attributes']);
                     }
                     break;
-                case 'extra':
-                    if (d[i][k]) {
-                        r = '<input type="checkbox" data-id="' + i + '" data-type="' + i + '" checked onchange=ChangeDev(this)>';
+                case 'features':
+                    let features = d[i]["features"];
+                    if (features == null) features = [];
+                    if (d[i]["model"] === "light") {
+                        r = '<input type="checkbox" data-id="' + i +
+                            '" data-feature="brightness" '+ (features.includes("brightness") ? "checked" : "") +
+                            ' onchange=ChangeFeatures(this)><label for="' + i +'">brightness</label>';
                     }
                     break;
                 default:
@@ -153,7 +173,7 @@ function apiGet() {
     xhr.onload = function () {
         if (xhr.status == 200) {
 //         alert(`Готово, получили ${xhr.response.length} байт`);
-            UpdateDeviceList(JSON.parse(xhr.response)['devices'])
+            UpdateDeviceList(JSON.parse(xhr.response))
         } else { // если всё прошло гладко, выводим результат
             console.log(`Ошибка ${xhr.status}: ${xhr.statusText}`); // Например, 404: Not Found
         }

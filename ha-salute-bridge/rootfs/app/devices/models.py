@@ -22,5 +22,6 @@ class DeviceModel(BaseModel):
     enabled: bool | None = None
     name: str | None = None
     state: str
-    model: DeviceModelsEnum
+    model: DeviceModelsEnum | None = None
+    features: list[LightAttrsEnum] | None = None
     attributes: dict | None = None

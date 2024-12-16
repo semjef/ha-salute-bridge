@@ -20,15 +20,24 @@ class Devices:
         self._devices = {key: DeviceModel(**val) for key, val in data.items()}
 
     def save(self):
-        ta = TypeAdapter(dict[str, DeviceModel])
         with open(self.devices_file, 'wb') as f:
-            f.write(ta.dump_json(self._devices, indent=4))
+            f.write(self.as_json(indent=4))
 
-    def update(self, key: str, data: DeviceModel):
+    def as_json(self, **kwargs):
+        ta = TypeAdapter(dict[str, DeviceModel])
+        return ta.dump_json(self._devices, **kwargs)
+
+    def as_dict(self, **kwargs):
+        ta = TypeAdapter(dict[str, DeviceModel])
+        return ta.dump_python(self._devices, **kwargs)
+
+    def update(self, key: str, data: DeviceModel | dict):
         if key in self._devices:
-            update_data = data.model_dump(exclude_unset=True)
-            self._devices[key] = self._devices[key].model_copy(update=update_data)
+            if isinstance(data, DeviceModel):
+                data = data.model_dump(exclude_unset=True)
+            self._devices[key] = self._devices[key].model_copy(update=data)
         else:
+            data.model = DeviceModelsEnum.light
             self._devices[key] = data
 
     def change_state(self, key, value):

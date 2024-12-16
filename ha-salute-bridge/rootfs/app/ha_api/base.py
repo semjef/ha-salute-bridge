@@ -126,11 +126,15 @@ class HAApiClient:
         entity_id = event.data['new_state']['entity_id']
         old_state = event.data['old_state']['state']
         new_state = event.data['new_state']['state']
+        attrs = event.data['new_state']['attributes']
         device = self.devices[entity_id]
         if device is None or not device.enabled:
             return
         logging.debug('HA Event: %s: %s -> %s', entity_id, old_state, new_state)
-        self.devices.change_state(entity_id, new_state)
+        device.state = new_state
+        if 'brightness' in attrs:
+            device.attributes = {LightAttrsEnum.brightness: attrs["brightness"]}
+        self.devices.update(entity_id, device)
         await self.send_data(entity_id)
 
     async def send_data(self, data):
@@ -164,6 +168,7 @@ class HAApiClient:
             }
             if data.get('service_data'):
                 req['service_data'] = data['service_data']
+            logging.debug('Отправляем команду в HA для %s %s', entity_id, data)
             await self.client.send_command("call_service", **req)
             self.queue_read.task_done()
 
@@ -175,7 +180,7 @@ class HAApiClient:
             "entity_name": device.entity_id,
             "service": service
         }
-        if device.attributes and "brightness" in device.attributes:
+        if device.attributes and "brightness" in device.attributes and device.attributes["brightness"] is not None:
             data['service_data'] = {"brightness": device.attributes["brightness"]}
         return data
 
@@ -222,7 +227,7 @@ class HAApiClient:
                         category=category,
                         name=fn,
                         state=state,
-                        model=DeviceModelsEnum.light
+                        # model=DeviceModelsEnum.light
                     )
                     if "brightness" in attributes:
                         entity.attributes = {LightAttrsEnum.brightness: attributes["brightness"]}
