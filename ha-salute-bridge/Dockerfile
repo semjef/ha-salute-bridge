@@ -1,7 +1,8 @@
 ARG BUILD_FROM
 FROM $BUILD_FROM
-
+RUN echo "${BUILD_FROM}"
 RUN apk add --no-cache python3
+RUN apk add --no-cache py3-pip gcc
 
 RUN pip3 install poetry==1.8.5
 
