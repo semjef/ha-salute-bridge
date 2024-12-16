@@ -162,7 +162,7 @@ class HAApiClient:
                 "domain": data["entity_domain"],
                 "service": data["service"],
                 "target": {
-                    "entity_id": f"{data["entity_domain"]}.{data["entity_name"]}"
+                    "entity_id": f"{data['entity_domain']}.{data['entity_name']}"
                 },
                 "return_response": False
             }
