@@ -1,6 +1,6 @@
 name: "SaluteBridge"
 description: "Use your Salute assistent with HomeAssistant"
-version: "1.0.0"
+version: "0.1.0"
 slug: "ha-salute-bridge"
 webui: "http://[HOST]:[PORT:9321]"
 startup: application
@@ -29,13 +29,17 @@ options:
   sd_mqtt_password: "mqtt-sber-password"
   sd_http_api_endpoint: "https://mqtt-partners.iot.sberdevices.ru"
   log_level: INFO
+  host: "127.0.0.1"
+  port: 9124
 
 schema:
-  ha_api_url: str
-  ha_api_token: str
+  ha_api_url: str?
+  ha_api_token: str?
   sd_mqtt_broker: str
   sd_mqtt_broker_port: int
   sd_mqtt_login: str
   sd_mqtt_password: password
   sd_http_api_endpoint: str?
   log_level: list(NOTSET|DEBUG|INFO|WARNING|ERROR|FATAL)
+  host: str
+  port: int
