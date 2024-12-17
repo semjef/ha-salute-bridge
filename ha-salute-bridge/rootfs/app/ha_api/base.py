@@ -152,26 +152,29 @@ class HAApiClient:
             await asyncio.sleep(1)
         while True:
             entity_id = await self.queue_read.get()
-            logging.debug('Отправляем команду в HA для %s', entity_id)
-            device = self.devices[entity_id]
-            match device.category:
-                case 'light':
-                    data = self.process_light(device)
-                case _:
-                    # Не обрабатываем ничего, кроме этих типов
-                    continue
-            req = {
-                "domain": data["entity_domain"],
-                "service": data["service"],
-                "target": {
-                    "entity_id": f"{data['entity_domain']}.{data['entity_name']}"
-                },
-                "return_response": False
-            }
-            if data.get('service_data'):
-                req['service_data'] = data['service_data']
-            logging.debug('Отправляем команду в HA для %s %s', entity_id, data)
-            await self.client.send_command("call_service", **req)
+            try:
+                logging.debug('Отправляем команду в HA для %s', entity_id)
+                device = self.devices[entity_id]
+                match device.category:
+                    case 'light':
+                        data = self.process_light(device)
+                    case _:
+                        # Не обрабатываем ничего, кроме этих типов
+                        continue
+                req = {
+                    "domain": data["entity_domain"],
+                    "service": data["service"],
+                    "target": {
+                        "entity_id": f"{data['entity_domain']}.{data['entity_name']}"
+                    },
+                    "return_response": False
+                }
+                if data.get('service_data'):
+                    req['service_data'] = data['service_data']
+                logging.debug('Отправляем команду в HA для %s %s', entity_id, data)
+                await self.client.send_command("call_service", **req)
+            except:
+                logging.error('Ошибка при обработке %s', entity_id)
             self.queue_read.task_done()
 
     @staticmethod
@@ -182,7 +185,13 @@ class HAApiClient:
             "entity_name": device.entity_id,
             "service": service
         }
-        if device.attributes and "brightness" in device.attributes and device.attributes["brightness"] is not None:
+
+        if (
+                device.state == "on" and
+                device.attributes and
+                "brightness" in device.attributes and
+                device.attributes["brightness"] is not None
+        ):
             data['service_data'] = {"brightness": device.attributes["brightness"]}
         return data
 

@@ -29,7 +29,7 @@ options:
   sd_mqtt_password: "mqtt-sber-password"
   sd_http_api_endpoint: "https://mqtt-partners.iot.sberdevices.ru"
   log_level: INFO
-  host: "127.0.0.1"
+  host: "0.0.0.0"
   port: 9124
 
 schema:
