@@ -1,3 +1,4 @@
+ARG BUILD_FROM
 FROM python:3.12 as builder
 
 WORKDIR /tmp
@@ -7,7 +8,6 @@ RUN pip install poetry==1.8.5
 
 RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
 
-ARG BUILD_FROM
 FROM $BUILD_FROM
 
 COPY  rootfs /
