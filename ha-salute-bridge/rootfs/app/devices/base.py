@@ -1,9 +1,8 @@
 from pydantic import TypeAdapter
 
-from const import VERSION
-from utils import json_read, json_write
-
+from utils import json_read
 from .models import *
+
 
 class Devices:
     _devices: dict[str, DeviceModel]  # ключи в виде "category.entity_id"

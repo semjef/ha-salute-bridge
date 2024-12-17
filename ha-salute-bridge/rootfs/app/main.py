@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from const import CATEGORIES_FILENAME, DEVICES_FILENAME
-from devices import GetCategory, Devices, DeviceModel, DeviceModelsEnum
+from devices import Devices, DeviceModel, DeviceModelsEnum
 from options import load_options
 from logger import Logger
 from salute.base import SaluteClient
@@ -21,7 +21,6 @@ Logger.init(opt)
 mqtt_queue = asyncio.Queue()
 ha_queue = asyncio.Queue()
 
-categories = GetCategory(opt, CATEGORIES_FILENAME)
 devices = Devices(DEVICES_FILENAME)
 
 if sys.platform.lower() == "win32" or os.name.lower() == "nt":
@@ -33,7 +32,7 @@ if sys.platform.lower() == "win32" or os.name.lower() == "nt":
 async def lifespan(app: FastAPI):
     ha_client = HAApiClient(opt, queue_write=mqtt_queue, queue_read=ha_queue, devices=devices)
     salute_client = SaluteClient(
-        opt, queue_write=ha_queue, queue_read=mqtt_queue, devices=devices, categories=categories
+        opt, queue_write=ha_queue, queue_read=mqtt_queue, devices=devices, categories_file=CATEGORIES_FILENAME
     )
 
     await ha_client.startup_load()

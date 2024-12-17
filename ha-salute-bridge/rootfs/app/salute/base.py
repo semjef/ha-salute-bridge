@@ -1,26 +1,32 @@
 import asyncio
+import json
 import logging
+import os
+import ssl
 
 import aiomqtt
-import ssl
-import json
-import logging as log
+import requests
 
-from devices import Devices, DeviceModel, DeviceModelsEnum, LightAttrsEnum
+from devices import Devices, LightAttrsEnum
 from options import options_change
+from utils import json_read, json_write
 
 
 class SaluteClient:
-    def __init__(self, options, queue_write, queue_read, devices: Devices, categories):
+    def __init__(self, options, queue_write, queue_read, devices: Devices, categories_file):
         self.options = options
         self.queue_write = queue_write
         self.queue_read = queue_read
         self.devices = devices
-        self.categories = categories
+
+        self.categories_file = categories_file
+        self.categories = {}
 
         self.client = None
         self.sber_root_topic = f"sberdevices/v1/{options['sd_mqtt_login']}"
         self.stdown = f"{self.sber_root_topic}/down"
+
+        self.load_categories()
 
     async def listen(self):
         client = aiomqtt.Client(
@@ -57,11 +63,11 @@ class SaluteClient:
                         else:
                             self.on_message(message)
             except aiomqtt.MqttError:
-                log.warning(f"Connection lost; Reconnecting in {interval} seconds ...")
+                logging.warning(f"Connection lost; Reconnecting in {interval} seconds ...")
                 await asyncio.sleep(interval)
 
     def on_message(self, msg):
-        log.debug("on_message %s %s %s", msg.topic, msg.qos, msg.payload)
+        logging.debug("on_message %s %s %s", msg.topic, msg.qos, msg.payload)
 
     async def send_status(self, data):
         logging.debug("send_status:%s", data)
@@ -72,12 +78,12 @@ class SaluteClient:
         await self.client.publish(f"{self.sber_root_topic}/up/config", data)
 
     def on_errors(self, msg):
-        log.info("Sber MQTT Errors: %s %s %s", msg.topic, msg.qos, msg.payload)
+        logging.info("Sber MQTT Errors: %s %s %s", msg.topic, msg.qos, msg.payload)
 
     async def on_message_cmd(self, msg):
         data = json.loads(msg.payload)
         # Command: {'devices': {'Relay_03': {'states': [{'key': 'on_off', 'value': {'type': 'BOOL'}}]}}}
-        log.info("Sber MQTT Command: %s", data)
+        logging.info("Sber MQTT Command: %s", data)
         for entity_id, v in data['devices'].items():
             device = self.devices[entity_id]
             for state in v['states']:
@@ -103,12 +109,12 @@ class SaluteClient:
 
     async def on_message_stat(self, msg):
         data = json.loads(msg.payload).get('devices', [])
-        log.info("GetStatus: %s", msg.payload)
+        logging.info("GetStatus: %s", msg.payload)
         await self.send_status(self.get_salute_states_list(data))
         # log.debug("Answer: " + self.devices.mqtt_json_states_list)
 
     def on_message_conf(self, msg):
-        log.info("Config: %s %s %s", msg.topic, msg.qos, msg.payload)
+        logging.info("Config: %s %s %s", msg.topic, msg.qos, msg.payload)
 
     def on_global_conf(self, msg):
         data = json.loads(msg.payload)
@@ -238,3 +244,30 @@ class SaluteClient:
                     entity_id = data["data"]
                     await self.send_status(self.get_salute_states_list([entity_id]))
             self.queue_read.task_done()
+
+    def load_categories(self):
+        hds = {'content-type': 'application/json'}
+        auth = (self.options['sd_mqtt_login'], self.options['sd_mqtt_password'])
+        categories_url = f"{self.options['sd_http_api_endpoint']}/v1/mqtt-gate/categories"
+        if not os.path.exists(self.categories_file):
+            logging.info('Файл категорий отсутствует. Получаем...')
+            categories = {}
+            SD_Categories = requests.get(
+                categories_url,
+                headers=hds,
+                auth=auth
+            ).json()
+            for id in SD_Categories['categories']:
+                logging.debug('Получаем опции для котегории: %s', id)
+                SD_Features = requests.get(
+                    f"{categories_url}/{id}/features",
+                    headers=hds,
+                    auth=auth
+                ).json()
+                categories[id] = SD_Features['features']
+            #   log(Categories)
+            json_write('categories.json', categories)
+        else:
+            logging.info('Список категорий получен из файла: %s', self.categories_file)
+            categories = json_read(self.categories_file)
+        self.categories = categories
