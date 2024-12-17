@@ -37,9 +37,11 @@ class HAApiClient:
             self.ha_ws_url = f"ws://{ha_api_url}/api/websocket"
             self.ha_api_token = options.get("ha_api_token")
         else:
-            self.ha_api_url = "http://supervisor/core"
+            self.ha_api_url = "http://supervisor/core/api"
             self.ha_ws_url = "ws://supervisor/core/websocket"
             self.ha_api_token = os.getenv("SUPERVISOR_TOKEN")
+
+        logging.debug("%s %s %s", self.ha_api_url, self.ha_ws_url, self.ha_api_token)
 
         self.client = HomeAssistantClient(self.ha_ws_url, self.ha_api_token)
         self.client.register_on_connection(self.on_connection)

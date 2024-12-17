@@ -266,6 +266,7 @@ class SaluteClient:
                 ).json()
                 categories[id] = SD_Features['features']
             #   log(Categories)
+            logging.info('Категории получены. Сохраняем в файл.')
             json_write('categories.json', categories)
         else:
             logging.info('Список категорий получен из файла: %s', self.categories_file)
