@@ -1,18 +1,28 @@
-ARG BUILD_FROM
-FROM $BUILD_FROM
+FROM python:3.12 as builder
 
-RUN apk add --no-cache python3
-RUN apk add --no-cache py3-pip gcc git
+WORKDIR /tmp
+COPY pyproject.toml poetry.lock /tmp/
 
-COPY rootfs /
+RUN pip install poetry==1.8.5
 
-WORKDIR /data
+RUN poetry export -f requirements.txt --output requirements.txt --without-hashes
 
-COPY requirements.txt /
+ARG BUILD_ARCH
+FROM ghcr.io/home-assistant/${BUILD_ARCH}-base-python:3.12-alpine3.21
+
+COPY  rootfs /
+
+WORKDIR /
+
+RUN apk add --no-cache git
+
+COPY --from=builder /tmp/requirements.txt /requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
 
+ARG SUPERVISOR_TOKEN
 RUN export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
 
+WORKDIR /data
 RUN chmod a+x /app/run.sh
 
 CMD [ "/app/run.sh" ]
