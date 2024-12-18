@@ -13,7 +13,7 @@ from hass_client.exceptions import (
 )
 from hass_client.models import Event
 
-from devices import Devices, DeviceModel, DeviceModelsEnum, LightAttrsEnum, ButtonAttrsEnum
+from devices import Devices, DeviceModel, DeviceModelsEnum, LightAttrsEnum, ButtonAttrsEnum, SensorAttrsEnum
 from models.exceptions import NotFoundAgainError, ServiceTimeoutError
 from .client import HomeAssistantClient
 
@@ -163,6 +163,8 @@ class HAApiClient:
                         data = self.process_switch(device)
                     case 'input_boolean':
                         data = self.process_switch(device)
+                    case 'script':
+                        data = self.process_switch(device)
                     case _:
                         # Не обрабатываем ничего, кроме этих типов
                         continue
@@ -262,30 +264,28 @@ class HAApiClient:
                     if "brightness" in attributes:
                         entity.attributes = {LightAttrsEnum.brightness: attributes["brightness"]}
                     self.devices.update(s['entity_id'], entity)
-                    # {'entity_id': 'light.0x54ef441000b86867_l1', 'state': 'on',
-                    #  'attributes': {'min_color_temp_kelvin': 2702, 'max_color_temp_kelvin': 6535, 'min_mireds': 153,
-                    #                 'max_mireds': 370, 'supported_color_modes': ['color_temp', 'xy'], 'color_mode': 'xy',
-                    #                 'brightness': 255, 'color_temp_kelvin': None, 'color_temp': None,
-                    #                 'hs_color': [27.458, 23.137], 'rgb_color': [255, 223, 196], 'xy_color': [0.382, 0.354],
-                    #                 'friendly_name': 'Подсветка кабинет 1 L1', 'supported_features': 40},
-                    #  'last_changed': '2024-12-11T11:59:04.194943+00:00',
-                    #  'last_reported': '2024-12-11T11:59:04.194943+00:00',
-                    #  'last_updated': '2024-12-11T11:59:04.194943+00:00',
-                    #  'context': {'id': '01JETSCGSD599T5JBGZFA0VX00', 'parent_id': None, 'user_id': None}}
                 case "script":
                     logging.debug('script: %s %s', s['entity_id'], fn)
-                    # self.devices.update(
-                    #     s['entity_id'],
-                    #     {'entity_ha': True, 'entity_type': 'scr', 'friendly_name': fn, 'category': 'relay'}
-                    # )
+                    entity = DeviceModel(
+                        entity_id=entity_id,
+                        category=category,
+                        name=fn,
+                        state=state,
+                        model=DeviceModelsEnum.relay
+                    )
+                    self.devices.update(s['entity_id'], entity)
                 case "sensor":
                     if dc == 'temperature':
                         logging.debug('sensor (temperature): %s %s', s['entity_id'], fn)
-                        # self.devices.update(
-                        #     s['entity_id'],
-                        #     {'entity_ha': True, 'entity_type': 'sensor_temp', 'friendly_name': fn,
-                        #       'category': 'sensor_temp'}
-                        # )
+                        entity = DeviceModel(
+                            entity_id=entity_id,
+                            category=category,
+                            name=fn,
+                            state=state,
+                            model=DeviceModelsEnum.sensor_temp,
+                            features=[SensorAttrsEnum.temperature]
+                        )
+                        self.devices.update(s['entity_id'], entity)
                 case "input_boolean":
                     logging.debug('input_boolean: %s %s', s['entity_id'], fn)
                     entity = DeviceModel(
@@ -297,19 +297,18 @@ class HAApiClient:
                         features=[ButtonAttrsEnum.button_event]
                     )
                     self.devices.update(s['entity_id'], entity)
-                    # self.devices.update(
-                    #     s['entity_id'],
-                    #     {'entity_ha': True, 'entity_type': 'input_boolean', 'friendly_name': fn,
-                    #      'category': 'scenario_button'}
-                    # )
-                case "hvac_radiator":
+                case "climate":
                     if dc == 'temperature':
-                        logging.debug('hvac_radiator (temperature): %s %s', s['entity_id'], fn)
-                        # self.devices.update(
-                        #     s['entity_id'],
-                        #     {'entity_ha': True, 'entity_type': 'hvac_radiator', 'friendly_name': fn,
-                        #      'category': 'hvac_radiator'}
+                        logging.debug('climate (temperature): %s %s', s['entity_id'], fn)
+                        # entity = DeviceModel(
+                        #     entity_id=entity_id,
+                        #     category=category,
+                        #     name=fn,
+                        #     state=state,
+                        #     model=DeviceModelsEnum.hvac_radiator,
+                        #     features=[HvacRadiatorAttrsEnum.temperature]
                         # )
+                        # self.devices.update(s['entity_id'], entity)
                 case _:
                     logging.debug('Неиспользуемый тип: %s',s['entity_id'])
         self.devices.save()

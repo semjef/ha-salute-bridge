@@ -7,7 +7,7 @@ import ssl
 import aiomqtt
 import requests
 
-from devices import Devices, LightAttrsEnum, ButtonAttrsEnum
+from devices import Devices, LightAttrsEnum, ButtonAttrsEnum, SensorAttrsEnum
 from options import options_change
 from utils import json_read, json_write
 
@@ -64,7 +64,7 @@ class SaluteClient:
                             else:
                                 self.on_message(message)
                         except UnicodeDecodeError:
-                            logging.warning(f"bad message; skip ...")
+                            logging.warning(f"bad message; skip %s", message.payload)
             except aiomqtt.MqttError:
                 logging.warning(f"Connection lost; Reconnecting in {interval} seconds ...")
                 await asyncio.sleep(interval)
@@ -105,7 +105,7 @@ class SaluteClient:
                     case 'on_off':
                         device.state = "on" if val else "off"
                     case 'light_brightness':
-                        val = int(val / 10 * 2.55)  # приводим из 50-1000 к диапозону 1-255
+                        val = round(val / 10 * 2.55)  # приводим из 50-1000 к диапозону 1-255
                         device.attributes[LightAttrsEnum.brightness] = val
                     case 'button_event':
                         device.state = "on" if val == "click" else "off"
@@ -204,7 +204,7 @@ class SaluteClient:
                     if LightAttrsEnum.brightness in device.features:
                         val = device.attributes.get(LightAttrsEnum.brightness)
                         if val is not None:  # Включено, но нету - не передаём
-                            val = int(val / 2.55 * 10)  # приводим из 1-255 к диапозону 50-1000
+                            val = round(val / 2.55 * 10)  # приводим из 1-255 к диапозону 50-1000
                             if val < 50:
                                 val = 50
                             if val > 1000:
@@ -215,6 +215,10 @@ class SaluteClient:
                     if ButtonAttrsEnum.button_event in device.features:
                         val = "click" if device.state == "on" else "double_click"
                         features.append(self.get_state_value("button_event", "ENUM", val))
+            case 'sensor':
+                if device.features:
+                    if SensorAttrsEnum.temperature in device.features:
+                        features.append(self.get_state_value("temperature", "INTEGER", int(device.state)))
 
         return features
 
