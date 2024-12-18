@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 class DeviceModelsEnum(StrEnum):
     light = auto()
     led_strip = auto()
+    relay = auto()
 
 
 class LightAttrsEnum(StrEnum):

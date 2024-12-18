@@ -86,6 +86,8 @@ class SaluteClient:
         logging.info("Sber MQTT Command: %s", data)
         for entity_id, v in data['devices'].items():
             device = self.devices[entity_id]
+            if device is None:
+                continue
             for state in v['states']:
                 val_type = state['value'].get('type', '')
                 val = ''
@@ -196,10 +198,14 @@ class SaluteClient:
         category_name = self.get_salute_category_name(device)
         category = self.categories.get(category_name)
         features = []
+        for ft in category:
+            if ft.get('required'):
+                if ft['name'] == "online":
+                    features.append(self.get_state_value("online", "BOOL", device.state != "unavailable"))
+                elif ft['name'] == "on_off":
+                    features.append(self.get_state_value("on_off", "BOOL", device.state == "on"))
         match device.category:
             case 'light':
-                features.append(self.get_state_value("online", "BOOL", device.state != "unavailable"))
-                features.append(self.get_state_value("on_off", "BOOL", device.state == "on"))
                 if device.features:
                     if LightAttrsEnum.brightness in device.features:
                         val = device.attributes.get(LightAttrsEnum.brightness)
@@ -210,9 +216,6 @@ class SaluteClient:
                             if val > 1000:
                                 val = 1000
                             features.append(self.get_state_value("light_brightness", "INTEGER", val))
-            case _:
-                # Не обрабатываем ничего, кроме этих типов
-                pass
         return features
 
     @staticmethod

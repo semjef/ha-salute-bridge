@@ -41,8 +41,6 @@ class HAApiClient:
             self.ha_ws_url = "ws://supervisor/core/websocket"
             self.ha_api_token = os.getenv("SUPERVISOR_TOKEN")
 
-        logging.debug("%s %s %s", self.ha_api_url, self.ha_ws_url, self.ha_api_token)
-
         self.client = HomeAssistantClient(self.ha_ws_url, self.ha_api_token)
         self.client.register_on_connection(self.on_connection)
 
@@ -122,22 +120,25 @@ class HAApiClient:
                 logging.exception(exception)
 
     async def on_events(self, event: Event):
-        # logging.debug("on_events %s", event)
-        if event.event_type != 'state_changed':
-            return
-        entity_id = event.data['new_state']['entity_id']
-        old_state = event.data['old_state']['state']
-        new_state = event.data['new_state']['state']
-        attrs = event.data['new_state']['attributes']
-        device = self.devices[entity_id]
-        if device is None or not device.enabled:
-            return
-        logging.debug('HA Event: %s: %s -> %s', entity_id, old_state, new_state)
-        device.state = new_state
-        if 'brightness' in attrs:
-            device.attributes = {LightAttrsEnum.brightness: attrs["brightness"]}
-        self.devices.update(entity_id, device)
-        await self.send_data(entity_id)
+        try:
+            # logging.debug("on_events %s", event)
+            if event.event_type != 'state_changed':
+                return
+            entity_id = event.data['new_state']['entity_id']
+            old_state = event.data['old_state']['state']
+            new_state = event.data['new_state']['state']
+            attrs = event.data['new_state']['attributes']
+            device = self.devices[entity_id]
+            if device is None or not device.enabled:
+                return
+            logging.debug('HA Event: %s: %s -> %s', entity_id, old_state, new_state)
+            device.state = new_state
+            if 'brightness' in attrs:
+                device.attributes = {LightAttrsEnum.brightness: attrs["brightness"]}
+            self.devices.update(entity_id, device)
+            await self.send_data(entity_id)
+        except:
+            logging.exception("HA Event failed %s", event.data)
 
     async def send_data(self, data):
         await self.queue_write.put({"type": "status", "data": data})
@@ -158,6 +159,8 @@ class HAApiClient:
                 match device.category:
                     case 'light':
                         data = self.process_light(device)
+                    case 'switch':
+                        data = self.process_switch(device)
                     case _:
                         # Не обрабатываем ничего, кроме этих типов
                         continue
@@ -195,6 +198,16 @@ class HAApiClient:
             data['service_data'] = {"brightness": device.attributes["brightness"]}
         return data
 
+    @staticmethod
+    def process_switch(device):
+        service = 'turn_on' if device.state == "on" else 'turn_off'
+        data = {
+            "entity_domain": device.category,
+            "entity_name": device.entity_id,
+            "service": service
+        }
+        return data
+
     async def startup_load(self):
         hds = {'Authorization': f'Bearer {self.ha_api_token}', 'content-type': 'application/json'}
         url = f'{self.ha_api_url}/states'
@@ -227,10 +240,14 @@ class HAApiClient:
             match category:
                 case "switch":
                     logging.debug('switch: %s %s', s['entity_id'], fn)
-                    # self.devices.update(
-                    #     s['entity_id'],
-                    #     {'entity_ha': True, 'entity_type': 'sw', 'friendly_name': fn, 'category': 'relay'}
-                    # )
+                    entity = DeviceModel(
+                        entity_id=entity_id,
+                        category=category,
+                        name=fn,
+                        state=state,
+                        model=DeviceModelsEnum.relay
+                    )
+                    self.devices.update(s['entity_id'], entity)
                 case "light":
                     logging.debug('light: %s %s', s['entity_id'], fn)
                     entity = DeviceModel(
