@@ -13,7 +13,7 @@ from hass_client.exceptions import (
 )
 from hass_client.models import Event
 
-from devices import Devices, DeviceModel, DeviceModelsEnum, LightAttrsEnum
+from devices import Devices, DeviceModel, DeviceModelsEnum, LightAttrsEnum, ButtonAttrsEnum
 from models.exceptions import NotFoundAgainError, ServiceTimeoutError
 from .client import HomeAssistantClient
 
@@ -161,6 +161,8 @@ class HAApiClient:
                         data = self.process_light(device)
                     case 'switch':
                         data = self.process_switch(device)
+                    case 'input_boolean':
+                        data = self.process_switch(device)
                     case _:
                         # Не обрабатываем ничего, кроме этих типов
                         continue
@@ -286,6 +288,15 @@ class HAApiClient:
                         # )
                 case "input_boolean":
                     logging.debug('input_boolean: %s %s', s['entity_id'], fn)
+                    entity = DeviceModel(
+                        entity_id=entity_id,
+                        category=category,
+                        name=fn,
+                        state=state,
+                        model=DeviceModelsEnum.scenario_button,
+                        features=[ButtonAttrsEnum.button_event]
+                    )
+                    self.devices.update(s['entity_id'], entity)
                     # self.devices.update(
                     #     s['entity_id'],
                     #     {'entity_ha': True, 'entity_type': 'input_boolean', 'friendly_name': fn,

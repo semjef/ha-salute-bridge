@@ -7,7 +7,7 @@ import ssl
 import aiomqtt
 import requests
 
-from devices import Devices, LightAttrsEnum
+from devices import Devices, LightAttrsEnum, ButtonAttrsEnum
 from options import options_change
 from utils import json_read, json_write
 
@@ -50,18 +50,21 @@ class SaluteClient:
                     await client.subscribe(f"{self.stdown}/#")
                     await client.subscribe("sberdevices/v1/__config")
                     async for message in client.messages:
-                        if message.topic.matches(f"sberdevices/v1/__config"):
-                            self.on_global_conf(message)
-                        elif message.topic.matches(f"{self.stdown}/errors"):
-                            self.on_errors(message)
-                        elif message.topic.matches(f"{self.stdown}/commands"):
-                            await self.on_message_cmd(message)
-                        elif message.topic.matches(f"{self.stdown}/status_request"):
-                            await self.on_message_stat(message)
-                        elif message.topic.matches(f"{self.stdown}/config_request"):
-                            self.on_message_conf(message)
-                        else:
-                            self.on_message(message)
+                        try:
+                            if message.topic.matches(f"sberdevices/v1/__config"):
+                                self.on_global_conf(message)
+                            elif message.topic.matches(f"{self.stdown}/errors"):
+                                self.on_errors(message)
+                            elif message.topic.matches(f"{self.stdown}/commands"):
+                                await self.on_message_cmd(message)
+                            elif message.topic.matches(f"{self.stdown}/status_request"):
+                                await self.on_message_stat(message)
+                            elif message.topic.matches(f"{self.stdown}/config_request"):
+                                self.on_message_conf(message)
+                            else:
+                                self.on_message(message)
+                        except UnicodeDecodeError:
+                            logging.warning(f"bad message; skip ...")
             except aiomqtt.MqttError:
                 logging.warning(f"Connection lost; Reconnecting in {interval} seconds ...")
                 await asyncio.sleep(interval)
@@ -104,6 +107,8 @@ class SaluteClient:
                     case 'light_brightness':
                         val = int(val / 10 * 2.55)  # приводим из 50-1000 к диапозону 1-255
                         device.attributes[LightAttrsEnum.brightness] = val
+                    case 'button_event':
+                        device.state = "on" if val == "click" else "off"
             self.devices.update(entity_id, device)
             await self.send_data(entity_id)
             # await self.send_status(self.devices.do_mqtt_json_states_list([_id]))
@@ -147,17 +152,18 @@ class SaluteClient:
                 'name': device.name,
                 'model_id': ''
             }
-            category_name = self.get_salute_category_name(device)
-            category = self.categories.get(category_name)
+            category = self.categories.get(device.model)
             features = []
             for ft in category:
                 if ft.get('required', False):
                     features.append(ft['name'])
-                if (
+                elif (
                     ft['name'] == 'light_brightness' and
                     device.features and
                     LightAttrsEnum.brightness in device.features
                 ):
+                    features.append(ft['name'])
+                elif device.features and ft['name'] in device.features:
                     features.append(ft['name'])
                 # Будем выдавать список из доступных фич для каждого типа в вебе и
                 # юзер сам будет включать их для каждого элемента
@@ -165,7 +171,7 @@ class SaluteClient:
                 'id': f'ID_{entity_id}',
                 'manufacturer': manufacturer,
                 'model': 'Model_' + device.model,
-                'category': category_name,
+                'category': device.model,
                 'features': features
             }
             devices.append(data)
@@ -183,20 +189,8 @@ class SaluteClient:
             devices[entity_id] = {'states': features}
         return json.dumps({'devices': devices}, ensure_ascii=False, sort_keys=True)
 
-    @staticmethod
-    def get_salute_category_name(device):
-        ha_to_salude_category = {
-            "light": "light",
-            "switch": "relay",
-            "script": "relay",
-            "sensor": "sensor_temp"
-        }
-        # Ещё нужно учесть device.model
-        return ha_to_salude_category.get(device.category, "relay")
-
     def get_features(self, device):
-        category_name = self.get_salute_category_name(device)
-        category = self.categories.get(category_name)
+        category = self.categories.get(device.model)
         features = []
         for ft in category:
             if ft.get('required'):
@@ -216,11 +210,16 @@ class SaluteClient:
                             if val > 1000:
                                 val = 1000
                             features.append(self.get_state_value("light_brightness", "INTEGER", val))
+            case 'input_boolean':
+                if device.features:
+                    if ButtonAttrsEnum.button_event in device.features:
+                        val = "click" if device.state == "on" else "double_click"
+                        features.append(self.get_state_value("button_event", "ENUM", val))
+
         return features
 
     @staticmethod
     def get_state_value(name, data_type, value):
-        # {'key':'online','value':{"type": "BOOL", "bool_value": True}}
         r = {}
         if name == 'temperature':
             value = value * 10

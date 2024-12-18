@@ -11,10 +11,15 @@ class DeviceModelsEnum(StrEnum):
     light = auto()
     led_strip = auto()
     relay = auto()
+    scenario_button = auto()
 
 
 class LightAttrsEnum(StrEnum):
     brightness = auto()
+
+
+class ButtonAttrsEnum(StrEnum):
+    button_event = auto()
 
 
 class DeviceModel(BaseModel):
@@ -23,6 +28,6 @@ class DeviceModel(BaseModel):
     enabled: bool | None = None
     name: str | None = None
     state: str
-    model: DeviceModelsEnum | None = None
-    features: list[LightAttrsEnum] | None = None
+    model: DeviceModelsEnum | None = Field(title="Идентификатор в Salute", default=None)
+    features: list[LightAttrsEnum | ButtonAttrsEnum] | None = None
     attributes: dict | None = None
