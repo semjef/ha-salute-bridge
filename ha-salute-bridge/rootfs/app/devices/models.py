@@ -33,6 +33,10 @@ class HvacRadiatorAttrsEnum(StrEnum):
     hvac_temp_set = auto()
 
 
+class AttrsEnum(LightAttrsEnum, ButtonAttrsEnum, SensorAttrsEnum, HvacRadiatorAttrsEnum):
+    pass
+
+
 class DeviceModel(BaseModel):
     entity_id: str = Field(title="Идентификатор устройства из HA")
     category: str = Field(title="Тип устройства из HA")
@@ -41,4 +45,4 @@ class DeviceModel(BaseModel):
     state: str
     model: DeviceModelsEnum | None = Field(title="Идентификатор в Salute", default=None)
     attributes: dict | None = None
-    features: list[LightAttrsEnum | ButtonAttrsEnum] | None = None
+    features: list[AttrsEnum] | None = None
