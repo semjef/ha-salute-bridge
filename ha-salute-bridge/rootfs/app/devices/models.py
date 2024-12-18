@@ -41,4 +41,4 @@ class DeviceModel(BaseModel):
     state: str
     model: DeviceModelsEnum | None = Field(title="Идентификатор в Salute", default=None)
     attributes: dict | None = None
-    features: list[LightAttrsEnum, ButtonAttrsEnum, SensorAttrsEnum, HvacRadiatorAttrsEnum] | None = None
+    features: list[LightAttrsEnum | ButtonAttrsEnum | SensorAttrsEnum | HvacRadiatorAttrsEnum] | None = None
