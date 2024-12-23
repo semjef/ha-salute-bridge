@@ -1,0 +1,12 @@
+{
+    "sd_mqtt_broker": "mqtt-partners.iot.sberdevices.ru",
+    "sd_mqtt_broker_port": 8883,
+    "sd_mqtt_login": "sd_mqtt_login",
+    "sd_mqtt_password": "sd_mqtt_password",
+    "sd_http_api_endpoint": "https://mqtt-partners.iot.sberdevices.ru",
+    "ha_api_url": "http://homeassistant.local:8123",
+    "ha_api_token": "token",
+    "host": "127.0.0.1",
+    "port": 9124,
+    "log_level": "debug"
+}

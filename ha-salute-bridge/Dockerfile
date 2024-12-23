@@ -25,4 +25,4 @@ RUN export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
 WORKDIR /data
 RUN chmod a+x /app/run.sh
 
-CMD [ "/app/run.sh" ]
+CMD [ "/bin/sh", "/app/run.sh" ]

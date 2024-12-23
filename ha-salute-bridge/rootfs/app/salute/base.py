@@ -224,8 +224,11 @@ class SaluteClient:
             case 'sensor':
                 if device.features:
                     if SensorAttrsEnum.temperature in device.features:
-                        features.append(self.get_state_value("temperature", "INTEGER", float(device.state)))
-
+                        try:
+                            val = float(device.state)
+                        except:
+                            val = 0
+                        features.append(self.get_state_value("temperature", "INTEGER", val))
         return features
 
     @staticmethod
