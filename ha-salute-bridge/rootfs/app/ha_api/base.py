@@ -133,8 +133,21 @@ class HAApiClient:
                 return
             logging.debug('HA Event: %s: %s -> %s', entity_id, old_state, new_state)
             device.state = new_state
+            device.attributes = {}
             if 'brightness' in attrs:
-                device.attributes = {LightAttrsEnum.brightness: attrs["brightness"]}
+                device.attributes["brightness"] = attrs["brightness"]
+            if 'hvac_modes' in attrs:
+                device.attributes["hvac_modes"] = attrs["hvac_modes"]
+            if 'preset_modes' in attrs:
+                device.attributes["preset_modes"] = attrs["preset_modes"]
+            if 'current_temperature' in attrs:
+                device.attributes["current_temperature"] = attrs["current_temperature"]
+            if 'temperature' in attrs:
+                device.attributes["temperature"] = attrs["temperature"]
+            if 'percentage' in attrs:
+                device.attributes["percentage"] = attrs["percentage"]
+            if 'percentage_step' in attrs:
+                device.attributes["percentage_step"] = attrs["percentage_step"]
             self.devices.update(entity_id, device)
             await self.send_data(entity_id)
         except:
@@ -262,7 +275,7 @@ class HAApiClient:
                         # model=DeviceModelsEnum.light
                     )
                     if "brightness" in attributes:
-                        entity.attributes = {LightAttrsEnum.brightness: attributes["brightness"]}
+                        entity.attributes = {"brightness": attributes["brightness"]}
                     self.devices.update(s['entity_id'], entity)
                 case "script":
                     logging.debug('script: %s %s', s['entity_id'], fn)
@@ -298,17 +311,14 @@ class HAApiClient:
                     )
                     self.devices.update(s['entity_id'], entity)
                 case "climate":
-                    if dc == 'temperature':
-                        logging.debug('climate (temperature): %s %s', s['entity_id'], fn)
-                        # entity = DeviceModel(
-                        #     entity_id=entity_id,
-                        #     category=category,
-                        #     name=fn,
-                        #     state=state,
-                        #     model=DeviceModelsEnum.hvac_radiator,
-                        #     features=[HvacRadiatorAttrsEnum.temperature]
-                        # )
-                        # self.devices.update(s['entity_id'], entity)
+                    logging.debug('climate: %s %s', s['entity_id'], fn)
+                    # entity = DeviceModel(
+                    #     entity_id=entity_id,
+                    #     category=category,
+                    #     name=fn,
+                    #     state=state
+                    # )
+                    # self.devices.update(s['entity_id'], entity)
                 case _:
                     logging.debug('Неиспользуемый тип: %s',s['entity_id'])
         self.devices.save()

@@ -7,7 +7,7 @@ import ssl
 import aiomqtt
 import requests
 
-from devices import Devices, LightAttrsEnum, ButtonAttrsEnum, SensorAttrsEnum
+from devices import Devices, DeviceModelsEnum, LightAttrsEnum, ButtonAttrsEnum, SensorAttrsEnum
 from options import options_change
 from utils import json_read, json_write
 
@@ -106,7 +106,7 @@ class SaluteClient:
                         device.state = "on" if val else "off"
                     case 'light_brightness':
                         val = round(val / 10 * 2.55)  # приводим из 50-1000 к диапозону 1-255
-                        device.attributes[LightAttrsEnum.brightness] = val
+                        device.attributes["brightness"] = val
                     case 'button_event':
                         device.state = "on" if val == "click" else "off"
             self.devices.update(entity_id, device)
@@ -152,6 +152,12 @@ class SaluteClient:
                 'name': device.name,
                 'model_id': ''
             }
+            if device.model is None:
+                match device.category:
+                    case "light":
+                        device.model = DeviceModelsEnum.light
+                    case _:
+                        continue
             category = self.categories.get(device.model)
             features = []
             for ft in category:
@@ -201,8 +207,8 @@ class SaluteClient:
         match device.category:
             case 'light':
                 if device.features:
-                    if LightAttrsEnum.brightness in device.features:
-                        val = device.attributes.get(LightAttrsEnum.brightness)
+                    if "brightness" in device.features:
+                        val = device.attributes.get("brightness")
                         if val is not None:  # Включено, но нету - не передаём
                             val = round(val / 2.55 * 10)  # приводим из 1-255 к диапозону 50-1000
                             if val < 50:
@@ -218,7 +224,7 @@ class SaluteClient:
             case 'sensor':
                 if device.features:
                     if SensorAttrsEnum.temperature in device.features:
-                        features.append(self.get_state_value("temperature", "INTEGER", int(device.state)))
+                        features.append(self.get_state_value("temperature", "INTEGER", float(device.state)))
 
         return features
 

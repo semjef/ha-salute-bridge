@@ -13,7 +13,10 @@ class DeviceModelsEnum(StrEnum):
     relay = auto()
     scenario_button = auto()
     sensor_temp = auto()
+    hvac_ac = auto()
+    hvac_fan = auto()
     hvac_radiator = auto()
+    hvac_underfloor_heating = auto()
 
 
 class LightAttrsEnum(StrEnum):
@@ -28,7 +31,25 @@ class SensorAttrsEnum(StrEnum):
     temperature = auto()
 
 
+class HvacACAttrsEnum(StrEnum):
+    hvac_air_flow_direction = auto()
+    hvac_air_flow_power = auto()
+    # hvac_temp_set = auto()  # Обязательный
+    hvac_work_mode = auto()
+    temperature = auto()
+
+
+class HvacFanAttrsEnum(StrEnum):
+    hvac_air_flow_power  = auto()
+    hvac_direction_set = auto()
+
+
 class HvacRadiatorAttrsEnum(StrEnum):
+    temperature = auto()
+    hvac_temp_set = auto()
+
+
+class HvacUnderfloorAttrsEnum(StrEnum):
     temperature = auto()
     hvac_temp_set = auto()
 

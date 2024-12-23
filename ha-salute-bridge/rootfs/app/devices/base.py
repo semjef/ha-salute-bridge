@@ -36,8 +36,6 @@ class Devices:
                 data = data.model_dump(exclude_unset=True)
             self._devices[key] = self._devices[key].model_copy(update=data)
         else:
-            if data.model is None:  # Временное решение
-                data.model = DeviceModelsEnum.light
             self._devices[key] = data
 
     def change_state(self, key, value):

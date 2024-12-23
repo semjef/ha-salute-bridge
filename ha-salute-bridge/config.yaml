@@ -1,6 +1,6 @@
 name: "SaluteBridge"
 description: "Use your Salute assistent with HomeAssistant"
-version: "0.1.10"
+version: "0.1.11"
 slug: "ha-salute-bridge"
 webui: "http://[HOST]:[PORT:9124]"
 startup: application
