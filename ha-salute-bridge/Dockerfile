@@ -19,10 +19,7 @@ RUN apk add --no-cache git
 COPY --from=builder /tmp/requirements.txt /requirements.txt
 RUN pip3 install --no-cache-dir -r /requirements.txt
 
-ARG SUPERVISOR_TOKEN
-RUN export SUPERVISOR_TOKEN=${SUPERVISOR_TOKEN}
-
 WORKDIR /data
-RUN chmod a+x /app/run.sh
+RUN chmod a+x /run.sh
 
-CMD [ "/bin/sh", "/app/run.sh" ]
+CMD [ "/run.sh" ]

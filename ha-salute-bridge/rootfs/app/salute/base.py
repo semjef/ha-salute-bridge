@@ -47,6 +47,7 @@ class SaluteClient:
             try:
                 async with client:
                     self.client = client
+                    logging.info(f"SaluteClient connected")
                     await client.subscribe(f"{self.stdown}/#")
                     await client.subscribe("sberdevices/v1/__config")
                     async for message in client.messages:

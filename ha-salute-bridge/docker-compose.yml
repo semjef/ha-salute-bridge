@@ -6,8 +6,12 @@ services:
     build:
       dockerfile: Dockerfile
       args:
-        BUILD_FROM: python:3.12-alpine3.21
+        BUILD_FROM: ghcr.io/home-assistant/amd64-base-python:3.12-alpine3.21
     network_mode: host
+#    ports:
+#      - "9124:9124"
+#    expose:
+#      - "9124"
     volumes:
       - ./data:/data
     restart: always

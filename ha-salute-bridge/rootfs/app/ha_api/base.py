@@ -125,8 +125,8 @@ class HAApiClient:
             if event.event_type != 'state_changed':
                 return
             entity_id = event.data['new_state']['entity_id']
-            old_state = event.data['old_state']['state']
-            new_state = event.data['new_state']['state']
+            old_state = event.data.get('old_state', {}).get('state')
+            new_state = event.data.get('new_state', {}).get('state', "unavailable")
             attrs = event.data['new_state']['attributes']
             device = self.devices[entity_id]
             if device is None or not device.enabled:
